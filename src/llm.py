@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass
 
 from openai import OpenAI
@@ -24,6 +25,9 @@ class Draft:
 
 
 def _load_persona() -> str:
+    env_persona = os.environ.get("PERSONA_CONTENT")
+    if env_persona:
+        return env_persona
     return config.PERSONA_PATH.read_text()
 
 

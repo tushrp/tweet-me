@@ -39,7 +39,7 @@ REPO_BLACKLIST: set[str] = set(os.environ.get("REPO_BLACKLIST", "").split(",")) 
 
 # Paths
 ROOT_DIR = Path(__file__).parent.parent
-DATA_DIR = ROOT_DIR / "data"
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT_DIR / "data")))
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "tweet_me.db"
 _persona = Path(__file__).parent / "persona.md"
