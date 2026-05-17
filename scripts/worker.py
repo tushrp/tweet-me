@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _nightly():
-    from main import run_nightly
+    from pipeline import run_nightly
     run_nightly()
 
 
