@@ -34,14 +34,11 @@ TWITTER_OAUTH2_REFRESH_TOKEN: str = os.environ.get("TWITTER_OAUTH2_REFRESH_TOKEN
 
 # Misc
 TIMEZONE = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Kolkata"))
-DRAFT_EXPIRY_HOURS: int = int(os.environ.get("DRAFT_EXPIRY_HOURS", "10"))
 REPO_BLACKLIST: set[str] = set(os.environ.get("REPO_BLACKLIST", "").split(",")) - {""}
+TWEET_SIGNATURE: str = os.environ.get("TWEET_SIGNATURE", "")
 
 # Paths
 ROOT_DIR = Path(__file__).parent.parent
-DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT_DIR / "data")))
-DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "tweet_me.db"
 _persona = Path(__file__).parent / "persona.md"
 PERSONA_PATH = _persona if _persona.exists() else Path(__file__).parent / "persona.md.example"
 LOGS_DIR = ROOT_DIR / "logs"

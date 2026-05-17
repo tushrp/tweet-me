@@ -1,11 +1,11 @@
 import logging
 import traceback
 
-import config  # noqa: F401 — triggers env load and dir creation
+import config  # noqa: F401 — triggers env load
 import github_fetch
 import llm
-import storage
 import telegram_bot
+import twitter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,6 +18,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _apply_signature(text: str) -> str:
+    if config.TWEET_SIGNATURE:
+        return f"{text}\n\n{config.TWEET_SIGNATURE}"
+    return text
+
+
 def run_nightly() -> None:
     logger.info("nightly run started")
 
@@ -26,9 +32,8 @@ def run_nightly() -> None:
         stale_repos = github_fetch.fetch_stale_repos(stale_after_days=14)
         logger.info(f"fetched {len(commits)} commits, {len(stale_repos)} stale repos")
 
-        recent = storage.get_recent_posted_tweets(days=7)
+        recent = twitter.get_recent_tweets(days=7)
         decision = llm.decide(commits, recent, stale_repos)
-        storage.log_decision(decision.should_post, decision.mood, decision.reasoning, len(commits))
         logger.info(f"decision: should_post={decision.should_post} mood={decision.mood} reason={decision.reasoning}")
 
         if not decision.should_post:
@@ -41,10 +46,12 @@ def run_nightly() -> None:
             return
 
         logger.info(f"generated {len(drafts)} draft(s)")
-        draft_dicts = [{"tweet": d.tweet, "confidence": d.confidence, "angle": d.angle} for d in drafts]
-        draft_ids = storage.save_pending_drafts(draft_dicts, commits)
+        draft_dicts = [
+            {"tweet": _apply_signature(d.tweet), "confidence": d.confidence, "angle": d.angle}
+            for d in drafts
+        ]
 
-        telegram_bot.send_drafts(draft_dicts, draft_ids)
+        telegram_bot.send_drafts(draft_dicts)
         logger.info("drafts sent to telegram")
 
     except Exception:

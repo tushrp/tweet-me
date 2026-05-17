@@ -67,3 +67,32 @@ def post(text: str) -> PostResult:
     tweet_id = str(resp.json()["data"]["id"])
     url = f"https://x.com/{config.GITHUB_USERNAME}/status/{tweet_id}"
     return PostResult(id=tweet_id, url=url)
+
+
+def get_recent_tweets(days: int = 7) -> list[dict]:
+    """Fetch your own recent tweets. Returns [] on any failure (e.g. free tier read limits)."""
+    from datetime import datetime, timedelta, timezone
+
+    try:
+        user_resp = requests.get(
+            f"https://api.twitter.com/2/users/by/username/{config.GITHUB_USERNAME}",
+            headers={"Authorization": f"Bearer {config.TWITTER_BEARER_TOKEN}"},
+            timeout=10,
+        )
+        if not user_resp.ok:
+            return []
+        user_id = user_resp.json()["data"]["id"]
+
+        start_time = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        tweets_resp = requests.get(
+            f"https://api.twitter.com/2/users/{user_id}/tweets",
+            headers={"Authorization": f"Bearer {config.TWITTER_BEARER_TOKEN}"},
+            params={"start_time": start_time, "max_results": 50, "tweet.fields": "created_at"},
+            timeout=10,
+        )
+        if not tweets_resp.ok:
+            return []
+        data = tweets_resp.json().get("data", [])
+        return [{"text": t["text"], "posted_at": t.get("created_at")} for t in data]
+    except Exception:
+        return []

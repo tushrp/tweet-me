@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/nightly",
+      "schedule": "0 21 * * *"
+    }
+  ],
+  "functions": {
+    "api/nightly.py": {
+      "maxDuration": 60
+    },
+    "api/webhook.py": {
+      "maxDuration": 30
+    }
+  }
+}

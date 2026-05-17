@@ -12,54 +12,50 @@ from telegram.ext import (
 )
 
 import config
-import storage
 import twitter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-_awaiting_edit = False
 
 
 def _guard(update: Update) -> bool:
     return update.effective_user is not None and update.effective_user.id == config.TELEGRAM_CHAT_ID
 
 
-def _build_keyboard(draft_ids: list[int]) -> InlineKeyboardMarkup:
-    post_buttons = [InlineKeyboardButton(f"✅ Post #{i+1}", callback_data=f"post:{draft_id}") for i, draft_id in enumerate(draft_ids)]
-    bottom_row = [
-        InlineKeyboardButton("✏️ Edit & post", callback_data="edit"),
-        InlineKeyboardButton("❌ Skip all", callback_data="skip"),
-    ]
-    rows = [post_buttons, bottom_row]
-    return InlineKeyboardMarkup(rows)
+def _draft_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Post", callback_data="post"),
+            InlineKeyboardButton("✏️ Edit", callback_data="edit"),
+            InlineKeyboardButton("⏭️ Skip", callback_data="skip"),
+        ]
+    ])
 
 
-def _format_message(drafts: list[dict], draft_ids: list[int]) -> str:
-    lines = ["*draft tweets for today*\n"]
-    for i, (draft, _) in enumerate(zip(drafts, draft_ids)):
-        confidence_pct = int(draft["confidence"] * 100)
-        lines.append(f"*{i+1}.* _{draft['angle']}_ ({confidence_pct}% confidence)")
-        lines.append(f"`{draft['tweet']}`")
-        lines.append("")
-    return "\n".join(lines).strip()
-
-
-async def _send_drafts_async(drafts: list[dict], draft_ids: list[int]) -> None:
+async def _send_drafts_async(drafts: list[dict]) -> None:
     bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
     async with bot:
-        text = _format_message(drafts, draft_ids)
-        keyboard = _build_keyboard(draft_ids)
         await bot.send_message(
             chat_id=config.TELEGRAM_CHAT_ID,
-            text=text,
+            text=f"*{len(drafts)} draft(s) for today*",
             parse_mode="Markdown",
-            reply_markup=keyboard,
         )
+        for i, draft in enumerate(drafts):
+            confidence_pct = int(draft["confidence"] * 100)
+            await bot.send_message(
+                chat_id=config.TELEGRAM_CHAT_ID,
+                text=f"_#{i+1} · {draft['angle']} · {confidence_pct}%_",
+                parse_mode="Markdown",
+            )
+            await bot.send_message(
+                chat_id=config.TELEGRAM_CHAT_ID,
+                text=draft["tweet"],
+                reply_markup=_draft_keyboard(),
+            )
 
 
-def send_drafts(drafts: list[dict], draft_ids: list[int]) -> None:
-    asyncio.run(_send_drafts_async(drafts, draft_ids))
+def send_drafts(drafts: list[dict]) -> None:
+    asyncio.run(_send_drafts_async(drafts))
 
 
 async def notify_error(message: str) -> None:
@@ -75,62 +71,56 @@ def notify_error_sync(message: str) -> None:
     asyncio.run(notify_error(message))
 
 
+def _apply_signature(text: str) -> str:
+    if config.TWEET_SIGNATURE and not text.rstrip().endswith(config.TWEET_SIGNATURE):
+        return f"{text}\n\n{config.TWEET_SIGNATURE}"
+    return text
+
+
 async def _post_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _guard(update):
         return
     query = update.callback_query
     await query.answer()
 
-    draft_id = int(query.data.split(":")[1])
-    pending = storage.get_pending_drafts()
-    draft = next((d for d in pending if d["id"] == draft_id), None)
-
-    if not draft:
-        await query.edit_message_text("draft not found or already actioned.")
-        return
-
+    tweet_text = query.message.text
     try:
-        result = twitter.post(draft["text"])
-        storage.mark_posted(draft_id, result.id, result.url)
-        storage.mark_skipped()
-        await query.edit_message_text(f"posted. {result.url}")
+        result = twitter.post(tweet_text)
+        await query.edit_message_text(f"posted ✅\n{result.url}")
     except Exception as e:
-        await query.edit_message_text(f"failed to post: {e}")
+        await query.edit_message_text(f"failed to post: {e}\n\noriginal draft:\n{tweet_text}")
 
 
 async def _edit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global _awaiting_edit
     if not _guard(update):
         return
     query = update.callback_query
     await query.answer()
-    _awaiting_edit = True
-    await query.edit_message_text("send me the tweet text (max 280 chars):")
+    # Remember which draft we're editing
+    context.user_data["editing_message_id"] = query.message.message_id
+    context.user_data["editing_original"] = query.message.text
+    await query.message.reply_text("send me the new tweet text:")
 
 
 async def _receive_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global _awaiting_edit
-    if not _guard(update) or not _awaiting_edit:
+    if not _guard(update):
+        return
+    if "editing_message_id" not in context.user_data:
         return
 
-    text = update.message.text.strip()
+    text = _apply_signature(update.message.text.strip())
     if len(text) > 280:
-        await update.message.reply_text(f"too long ({len(text)} chars). try again:")
+        await update.message.reply_text(f"too long ({len(text)} chars with signature). try again:")
         return
 
-    _awaiting_edit = False
-    pending = storage.get_pending_drafts()
-    draft_id = pending[0]["id"] if pending else None
+    context.user_data.pop("editing_message_id", None)
+    context.user_data.pop("editing_original", None)
 
     try:
         result = twitter.post(text)
-        if draft_id:
-            storage.mark_edited_and_posted(draft_id, text, result.id, result.url)
-        storage.mark_skipped()
-        await update.message.reply_text(f"posted. {result.url}")
+        await update.message.reply_text(f"posted ✅\n{result.url}")
     except Exception as e:
         await update.message.reply_text(f"failed to post: {e}")
-        _awaiting_edit = False
 
 
 async def _skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -138,27 +128,20 @@ async def _skip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     query = update.callback_query
     await query.answer()
-    storage.mark_skipped()
-    await query.edit_message_text("skipped. nothing posted today.")
+    await query.edit_message_text(f"skipped.\n\noriginal:\n{query.message.text}")
 
 
 async def _status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _guard(update):
         return
-    pending = storage.get_pending_drafts()
-    recent = storage.get_recent_posted_tweets(days=7)
-    lines = [f"pending drafts: {len(pending)}", f"tweets this week: {len(recent)}"]
-    if pending:
-        lines.append("\npending:")
-        for d in pending:
-            lines.append(f"  - {d['text'][:60]}...")
-    await update.message.reply_text("\n".join(lines))
+    recent = twitter.get_recent_tweets(days=7)
+    await update.message.reply_text(f"tweets in last 7 days: {len(recent)}")
 
 
 def run_bot() -> None:
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
 
-    app.add_handler(CallbackQueryHandler(_post_handler, pattern="^post:"))
+    app.add_handler(CallbackQueryHandler(_post_handler, pattern="^post$"))
     app.add_handler(CallbackQueryHandler(_edit_handler, pattern="^edit$"))
     app.add_handler(CallbackQueryHandler(_skip_handler, pattern="^skip$"))
     app.add_handler(CommandHandler("status", _status_command))

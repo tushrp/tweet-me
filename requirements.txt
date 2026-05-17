@@ -1,0 +1,5 @@
+PyGithub>=2.1
+openai>=1.30
+python-telegram-bot>=21.0
+requests>=2.31
+python-dotenv>=1.0
