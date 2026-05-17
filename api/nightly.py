@@ -1,15 +1,14 @@
 """Vercel cron-triggered nightly pipeline."""
-import sys
 from http.server import BaseHTTPRequestHandler
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from main import run_nightly
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from main import run_nightly
+
         try:
             run_nightly()
             status = 200
