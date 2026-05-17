@@ -2,7 +2,10 @@
 
 Usage:
     python scripts/set_webhook.py https://your-app.vercel.app
+
+Set TELEGRAM_WEBHOOK_SECRET in .env to enable webhook auth.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -21,9 +24,17 @@ def main() -> None:
     base_url = sys.argv[1].rstrip("/")
     webhook_url = f"{base_url}/api/webhook"
 
+    payload = {"url": webhook_url, "allowed_updates": ["message", "callback_query"]}
+    secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+    if secret:
+        payload["secret_token"] = secret
+        print(f"using webhook secret ({len(secret)} chars)")
+    else:
+        print("warning: no TELEGRAM_WEBHOOK_SECRET set — webhook will be unauthenticated")
+
     resp = requests.post(
         f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook",
-        json={"url": webhook_url, "allowed_updates": ["message", "callback_query"]},
+        json=payload,
         timeout=10,
     )
     print(f"setWebhook → {resp.status_code} {resp.text}")

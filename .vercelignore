@@ -1,0 +1,21 @@
+# Local dev only — Vercel uses requirements.txt
+pyproject.toml
+railway.toml
+
+# Local artifacts
+.venv/
+**/__pycache__/
+**/*.egg-info/
+*.pyc
+
+# Docs / notes
+README.md
+SPEC.md
+
+# Not needed in Vercel build (only used locally / for other deploys)
+scripts/
+deploy/
+data/
+logs/
+.env
+src/persona.md

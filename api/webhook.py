@@ -1,5 +1,6 @@
 """Vercel webhook handler for Telegram bot updates."""
 import json
+import os
 from http.server import BaseHTTPRequestHandler
 
 EDIT_PROMPT = "send me the new tweet text (reply to this message):"
@@ -95,6 +96,15 @@ def _process_update(update: dict) -> None:
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        webhook_secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET")
+        if webhook_secret:
+            sent = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if sent != webhook_secret:
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(b"unauthorized")
+                return
+
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
         try:
