@@ -42,4 +42,8 @@ ROOT_DIR = Path(__file__).parent.parent
 _persona = Path(__file__).parent / "persona.md"
 PERSONA_PATH = _persona if _persona.exists() else Path(__file__).parent / "persona.md.example"
 LOGS_DIR = ROOT_DIR / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
+try:
+    LOGS_DIR.mkdir(exist_ok=True)
+    LOGS_WRITABLE = True
+except OSError:
+    LOGS_WRITABLE = False

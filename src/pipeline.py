@@ -7,13 +7,13 @@ import llm
 import telegram_bot
 import twitter
 
+_handlers: list[logging.Handler] = [logging.StreamHandler()]
+if config.LOGS_WRITABLE:
+    _handlers.append(logging.FileHandler(config.LOGS_DIR / "nightly.log"))
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(config.LOGS_DIR / "nightly.log"),
-        logging.StreamHandler(),
-    ],
+    handlers=_handlers,
 )
 logger = logging.getLogger(__name__)
 
