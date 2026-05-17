@@ -132,23 +132,28 @@ def fetch_stale_repos(stale_after_days: int = 14) -> list[StaleRepo]:
 
 
 def summarize_for_llm(commits: list[Commit], stale_repos: list[StaleRepo] | None = None) -> str:
-    lines = []
-
     if not commits:
-        lines.append("commits today: none.")
-    else:
-        for c in commits:
-            diff_note = f"\n  diff (truncated):\n{c.diff}" if c.diff else ""
-            files = ", ".join(c.files_changed[:5])
-            if len(c.files_changed) > 5:
-                files += f" (+{len(c.files_changed) - 5} more)"
-            lines.append(
-                f"- [{c.repo}] {c.message} (+{c.additions}/-{c.deletions} lines, files: {files}){diff_note}"
-            )
+        return "commits today: none."
 
-    if stale_repos:
-        lines.append(f"\nunfinished project debt ({len(stale_repos)} repos abandoned):")
-        for r in stale_repos[:5]:
-            lines.append(f"- {r.name}: last commit {r.last_commit_days_ago} days ago (\"{r.last_message}\")")
+    by_repo: dict[str, list[Commit]] = {}
+    for c in commits:
+        by_repo.setdefault(c.repo, []).append(c)
 
-    return "\n".join(lines)
+    sections = []
+    for repo, repo_commits in by_repo.items():
+        sections.append(f"\n=== {repo} ({len(repo_commits)} commits today) ===")
+        sections.append("all commit messages for this project:")
+        for c in repo_commits:
+            sections.append(f"  - {c.message}")
+        sections.append("\nfiles touched across these commits:")
+        all_files = sorted({f for c in repo_commits for f in c.files_changed})
+        for f in all_files[:15]:
+            sections.append(f"  - {f}")
+        if len(all_files) > 15:
+            sections.append(f"  (+{len(all_files) - 15} more)")
+        diffs = [c.diff for c in repo_commits if c.diff]
+        if diffs:
+            sections.append("\nsample diffs (truncated):")
+            sections.append("\n".join(diffs))
+
+    return "\n".join(sections)

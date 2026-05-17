@@ -29,20 +29,13 @@ def run_nightly() -> None:
 
     try:
         commits = github_fetch.fetch_recent_commits(hours=24)
-        stale_repos = github_fetch.fetch_stale_repos(stale_after_days=14)
-        logger.info(f"fetched {len(commits)} commits, {len(stale_repos)} stale repos")
+        logger.info(f"fetched {len(commits)} commits")
 
         recent = twitter.get_recent_tweets(days=7)
-        decision = llm.decide(commits, recent, stale_repos)
-        logger.info(f"decision: should_post={decision.should_post} mood={decision.mood} reason={decision.reasoning}")
+        drafts = llm.generate_drafts(commits, recent)
 
-        if not decision.should_post:
-            logger.info("bot decided to stay silent today")
-            return
-
-        drafts = llm.draft(commits, recent, decision.mood, stale_repos)
         if not drafts:
-            logger.info("no valid drafts generated")
+            logger.info("nothing to post today")
             return
 
         logger.info(f"generated {len(drafts)} draft(s)")

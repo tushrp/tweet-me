@@ -14,7 +14,6 @@ BOT_OWNER_HANDLE: str = os.environ.get("BOT_OWNER_HANDLE", f"@{GITHUB_USERNAME}"
 
 # OpenAI
 OPENAI_API_KEY: str = os.environ["OPENAI_API_KEY"]
-OPENAI_MODEL_DECIDE: str = os.environ.get("OPENAI_MODEL_DECIDE", "gpt-4o-mini")
 OPENAI_MODEL_DRAFT: str = os.environ.get("OPENAI_MODEL_DRAFT", "gpt-4o")
 
 # Telegram
