@@ -15,7 +15,6 @@ SPEC.md
 # Not needed in Vercel build (only used locally / for other deploys)
 scripts/
 deploy/
-data/
 logs/
 .env
 src/persona.md
