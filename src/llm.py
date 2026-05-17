@@ -1,7 +1,6 @@
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime
 
 from openai import OpenAI
 
@@ -36,8 +35,7 @@ def generate_drafts(
     repos_today = sorted(set(c.repo for c in commits))
     project_list = ", ".join(repos_today) if repos_today else "none"
 
-    now = datetime.now(config.TIMEZONE)
-    header = f"{now.strftime('%b').lower()} {now.day}:"
+    header = "dev log:"
 
     max_chars = 280 - (len(config.TWEET_SIGNATURE) + 2 if config.TWEET_SIGNATURE else 0)
 
